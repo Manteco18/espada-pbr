@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Espada PBR – model-viewer</title>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+<style>
+  body{margin:0;font-family:system-ui,sans-serif;background:#14161a;color:#eee}
+  model-viewer{width:100vw;height:80vh;--poster-color:transparent;background:radial-gradient(circle at 50% 40%,#2a2f3a,#14161a)}
+  .bar{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;padding:16px}
+  button{padding:12px 18px;border:0;border-radius:8px;background:#c8963e;color:#111;font-weight:600;cursor:pointer}
+  button:hover{background:#e0ad55}
+  #estado{text-align:center;font-size:14px;opacity:.8;padding-bottom:12px}
+</style>
+</head>
+<body>
+<model-viewer id="mv" src="espada.glb" alt="Espada con texturas PBR" camera-controls auto-rotate
+  shadow-intensity="1" exposure="1.1" environment-image="neutral" camera-orbit="30deg 80deg auto"></model-viewer>
+<div class="bar">
+  <button id="b1">Texturas: clasica</button>
+  <button id="b2">Color del acero: original</button>
+  <button id="b3">Normal map del dorado: activado</button>
+</div>
+<div id="estado">Cargando…</div>
+<script>
+const mv=document.getElementById('mv'), est=document.getElementById('estado');
+const PARTS=['hoja','guarda','ala','centro','collarin','base','empunadura'];
+const DORADO=['guarda','ala','centro','collarin','base'];
+const SETS=['clasica','desgastada','oscura'];
+const TINTS=[['original',[1,1,1,1]],['azul acero',[.55,.7,1,1]],['oscuro',[.35,.35,.4,1]],['cálido',[1,.85,.6,1]]];
+let mats={}, cache={}, si=0, tint=0, bump=true;
+
+async function tex(part,s){
+  const k=part+'_'+s;
+  if(!cache[k]){
+    const u=t=>mv.createTexture(`textures/${k}_${t}.jpg`);
+    const [bc,mr,n]=await Promise.all([u('bc'),u('mr'),u('n')]);
+    cache[k]={bc,mr,n};
+  }
+  return cache[k];
+}
+async function aplicar(){
+  const s=SETS[si];
+  for(const part of PARTS){
+    const m=mats[part]; if(!m) continue;
+    const t=await tex(part,s), p=m.pbrMetallicRoughness;
+    p.baseColorTexture.setTexture(t.bc);
+    p.metallicRoughnessTexture.setTexture(t.mr);
+    m.normalTexture.setTexture(DORADO.includes(part)&&!bump?null:t.n);
+  }
+  if(mats.hoja) mats.hoja.pbrMetallicRoughness.setBaseColorFactor(TINTS[tint][1]);
+  est.textContent=`Set: ${s} · Acero: ${TINTS[tint][0]} · Normal del dorado: ${bump?'sí':'no'}`;
+}
+mv.addEventListener('load',()=>{ mv.model.materials.forEach(m=>mats[m.name]=m); aplicar(); });
+b1.onclick=()=>{si=(si+1)%SETS.length; b1.textContent='Texturas: '+SETS[si]; aplicar();};
+b2.onclick=()=>{tint=(tint+1)%TINTS.length; b2.textContent='Color del acero: '+TINTS[tint][0]; aplicar();};
+b3.onclick=()=>{bump=!bump; b3.textContent='Normal map del dorado: '+(bump?'activado':'desactivado'); aplicar();};
+</script>
+</body>
+</html>
